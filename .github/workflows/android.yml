@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feature/dispatcher-web-dashboard
 
 jobs:
   build:
