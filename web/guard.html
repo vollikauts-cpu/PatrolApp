@@ -455,6 +455,20 @@ $('shareLocation').onclick=async()=>{
    const latitude=position.coords.latitude;
    const longitude=position.coords.longitude;
    currentLocation=[latitude,longitude];
+
+   if(locationMarker) {
+     locationMarker.setLatLng(currentLocation);
+   } else {
+     locationMarker=L.circleMarker(currentLocation,{
+       radius:9,color:'#fff',
+       fillColor:'#249fff',fillOpacity:1
+     }).addTo(map).bindPopup('Мой патруль');
+   }
+
+   const active=calls.find(c=>c.id===selected);
+   const destination=active?coords(findSite(active)):null;
+   if(destination)await drawRoute(destination);
+
    await api('/patrol/location',{
     method:'POST',
     body:JSON.stringify({latitude,longitude})
@@ -733,6 +747,9 @@ async function start(){
   $('logout').classList.remove('hidden');
   initMap();
   await refresh();
+  if(sharingWatch===null) {
+    $('shareLocation').click();
+  }
  }catch(e){
   message(e.message);
   token=null;user=null;
@@ -753,6 +770,11 @@ $('loginForm').onsubmit=async e=>{
 };
 $('logout').onclick=()=>{
  stopSiren();pendingCallIds.clear();
+ if(sharingWatch!==null){
+   navigator.geolocation.clearWatch(sharingWatch);
+   sharingWatch=null;
+   api('/patrol/location',{method:'DELETE'}).catch(()=>{});
+ }
  token=null;user=null;calls=[];initializedCalls=false;
  sessionStorage.removeItem('guard_token');
  $('workspace').classList.add('hidden');
