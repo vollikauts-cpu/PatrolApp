@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PatrolApp Operations</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090d1b;color:#f1f5f9;font-family:Arial,sans-serif}
+header{padding:18px;background:#11182c;border-bottom:1px solid #29324a}
+h1{font-size:23px;margin:0 0 5px}
+h2{font-size:19px}
+p,small{color:#aab5cf}
+main{max-width:1100px;margin:auto;padding:18px}
+.card{background:#151d33;border:1px solid #293550;border-radius:15px;padding:18px;margin-bottom:15px}
+input,select,textarea,button{font:inherit;border-radius:9px;padding:12px}
+input,select,textarea{width:100%;margin:5px 0 12px;background:#0d1426;color:white;border:1px solid #394563}
+button{background:#6557ed;color:white;border:0;cursor:pointer;margin:4px}
+button:disabled{opacity:.45}
+button.secondary{background:#34415d}
+button.danger{background:#b42343}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.badge{padding:6px 10px;border-radius:20px;background:#293958;font-size:12px}
+.urgent{color:#ff8c9a}
+.hidden{display:none}
+#error{color:#ff8c9a}
+#message{color:#86efac}
+</style>
+</head>
+<body>
+<header>
+<div class="row">
+<div><h1>🛡️ PatrolApp Operations</h1><small>Оперативный центр управления охраной</small></div>
+<div><span id="identity"></span><button id="logout" class="secondary hidden">Выход</button></div>
+</div>
+</header>
+<main>
+<div id="error"></div>
+<div id="message"></div>
+
+<section id="loginPanel" class="card">
+<h2>Вход в систему</h2>
+<form id="loginForm">
+<label>Email<input name="email" type="email" required autocomplete="username"></label>
+<label>Пароль<input name="password" type="password" required autocomplete="current-password"></label>
+<button>Войти</button>
+</form>
+</section>
+
+<section id="dashboard" class="hidden">
+<div class="grid">
+<div class="card">
+<h2>Мой профиль</h2>
+<div id="profile"></div>
+</div>
+<div class="card">
+<h2>Оперативная сводка</h2>
+<div id="summary"></div>
+<button id="refresh" class="secondary">Обновить</button>
+</div>
+</div>
+
+<div id="adminPanel" class="card hidden">
+<h2>Создать пользователя</h2>
+<form id="userForm">
+<input name="name" placeholder="Имя сотрудника" required>
+<input name="email" type="email" placeholder="Email" required>
+<input name="password" type="password" minlength="12" placeholder="Пароль от 12 символов" required>
+<select name="role">
+<option value="guard">Охранник</option>
+<option value="dispatcher">Диспетчер</option>
+<option value="admin">Администратор</option>
+</select>
+<button>Создать сотрудника</button>
+</form>
+</div>
+
+<div id="dispatchPanel" class="card hidden">
+<h2>Отправить вызов охраннику</h2>
+<form id="dispatchForm">
+<select name="guard_id" id="guardSelect" required></select>
+<select name="site_id" id="siteSelect"></select>
+<input name="title" placeholder="Причина вызова" required>
+<textarea name="description" placeholder="Описание задания"></textarea>
+<select name="priority">
+<option value="normal">Обычный</option>
+<option value="urgent">Срочный</option>
+</select>
+<button>🚨 Отправить вызов</button>
+</form>
+</div>
+
+<div id="alarmPanel" class="card hidden">
+<h2>Вызов диспетчера</h2>
+<form id="alarmForm">
+<input name="title" placeholder="Что произошло?" required>
+<textarea name="description" placeholder="Опиши ситуацию"></textarea>
+<select name="priority">
+<option value="urgent">Срочная тревога</option>
+<option value="normal">Обычное обращение</option>
+</select>
+<button class="danger">🚨 Отправить диспетчеру</button>
+</form>
+</div>
+
+<div class="card">
+<div class="row">
+<h2>Оперативные вызовы</h2>
+<span id="callCount" class="badge">0</span>
+</div>
+<div id="calls"></div>
+</div>
+</section>
+</main>
+
+<script type="module">
+const API = 'http://127.0.0.1:3001/api';
+let token = sessionStorage.getItem('patrol_token');
+let me = null;
+
+const $ = id => document.getElementById(id);
+const show = (id, visible) =>
+  $(id).classList.toggle('hidden', !visible);
+
+const escapeHTML = value => String(value ?? '')
+  .replaceAll('&','&amp;')
+  .replaceAll('<','&lt;')
+  .replaceAll('>','&gt;')
+  .replaceAll('"','&quot;')
+  .replaceAll("'",'&#39;');
+
+function notify(message, error = false) {
+  $('error').textContent = error ? message : '';
+  $('message').textContent = error ? '' : message;
+}
+
+async function request(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+
+  const response = await fetch(API + path, {
+    ...options,
+    headers
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    if (response.status === 401 && path !== '/auth/login') logout();
+    throw new Error(data.error || 'Ошибка сервера');
+  }
+
+  return data;
+}
+
+function logout() {
+  token = null;
+  me = null;
+  sessionStorage.removeItem('patrol_token');
+  show('loginPanel', true);
+  show('dashboard', false);
+  show('logout', false);
+  $('identity').textContent = '';
+}
+
+async function initialize() {
+  if (!token) return logout();
+
+  try {
+    me = await request('/auth/me');
+    show('loginPanel', false);
+    show('dashboard', true);
+    show('logout', true);
+
+    $('identity').textContent = me.name + ' · ' + me.role;
+    $('profile').textContent = `${me.name} (${me.role})`;
+
+    show('adminPanel', me.role === 'admin');
+    show('dispatchPanel', ['admin','dispatcher'].includes(me.role));
+    show('alarmPanel', me.role === 'guard');
+
+    await refresh();
+
+    if (['admin','dispatcher'].includes(me.role)) {
+      await loadOptions();
+    }
+  } catch (error) {
+    logout();
+    notify(error.message, true);
+  }
+}
+
+async function loadOptions() {
+  const [users, sites] = await Promise.all([
+    request('/users'),
+    request('/sites')
+  ]);
+
+  $('guardSelect').innerHTML = users
+    .filter(u => u.role === 'guard')
+    .map(u => `<option value="${u.id}">${escapeHTML(u.name)}</option>`)
+    .join('');
+
+  $('siteSelect').innerHTML =
+    '<option value="">Без объекта</option>' +
+    sites.map(s =>
+      `<option value="${s.id}">${escapeHTML(s.name)}</option>`
+    ).join('');
+}
+
+const statusNames = {
+  new:'Ожидает принятия',
+  accepted:'Принят',
+  enroute:'В пути',
+  onsite:'На месте',
+  completed:'Завершён',
+  alarm:'Тревога',
+  acknowledged:'Принята диспетчером'
+};
+
+function nextStatus(call) {
+  if (call.type === 'dispatch' && me.role === 'guard') {
+    return {
+      new:'accepted',
+      accepted:'enroute',
+      enroute:'onsite',
+      onsite:'completed'
+    }[call.status];
+  }
+
+  if (call.type === 'alarm' && me.role !== 'guard') {
+    return {
+      alarm:'acknowledged',
+      acknowledged:'completed'
+    }[call.status];
+  }
+
+  return null;
+}
+
+async function refresh() {
+  if (!me) return;
+
+  const calls = await request('/calls');
+
+  $('callCount').textContent = calls.length;
+  $('summary').textContent =
+    `Всего доступных вызовов: ${calls.length}; активных: ${
+      calls.filter(c => c.status !== 'completed').length
+    }`;
+
+  $('calls').replaceChildren();
+
+  if (!calls.length) {
+    $('calls').textContent = 'Пока нет вызовов';
+    return;
+  }
+
+  for (const call of calls) {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const title = document.createElement('h3');
+    title.textContent = `#${call.id} — ${call.title}`;
+
+    const details = document.createElement('p');
+    details.textContent =
+      `${call.type === 'alarm' ? 'Тревога' : 'Задание'} · ` +
+      `${statusNames[call.status] || call.status} · ` +
+      `${call.guard_name || 'Без исполнителя'} · ` +
+      `${call.site_name || 'Без объекта'}`;
+
+    const description = document.createElement('p');
+    description.textContent = call.description || '';
+
+    card.append(title, details, description);
+
+    if (call.priority === 'urgent') {
+      const priority = document.createElement('strong');
+      priority.className = 'urgent';
+      priority.textContent = 'СРОЧНО';
+      card.append(priority);
+    }
+
+    const next = nextStatus(call);
+
+    if (next) {
+      const button = document.createElement('button');
+      button.textContent = statusNames[next];
+      button.onclick = async () => {
+        try {
+          await request(`/calls/${call.id}/status`, {
+            method:'PATCH',
+            body:JSON.stringify({ status:next })
+          });
+          await refresh();
+        } catch (error) {
+          notify(error.message, true);
+        }
+      };
+      card.append(button);
+    }
+
+    $('calls').append(card);
+  }
+}
+
+$('loginForm').onsubmit = async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(
+    new FormData(event.target)
+  );
+
+  try {
+    const result = await request('/auth/login', {
+      method:'POST',
+      body:JSON.stringify(values)
+    });
+
+    token = result.token;
+    sessionStorage.setItem('patrol_token', token);
+    notify('Вход выполнен');
+    await initialize();
+  } catch (error) {
+    notify(error.message, true);
+  }
+};
+
+$('userForm').onsubmit = async event => {
+  event.preventDefault();
+  try {
+    await request('/users', {
+      method:'POST',
+      body:JSON.stringify(Object.fromEntries(new FormData(event.target)))
+    });
+    event.target.reset();
+    await loadOptions();
+    notify('Сотрудник создан');
+  } catch (error) {
+    notify(error.message, true);
+  }
+};
+
+$('dispatchForm').onsubmit = async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.target));
+  values.type = 'dispatch';
+
+  try {
+    await request('/calls', {
+      method:'POST',
+      body:JSON.stringify(values)
+    });
+    event.target.reset();
+    await refresh();
+    notify('Вызов отправлен охраннику');
+  } catch (error) {
+    notify(error.message, true);
+  }
+};
+
+$('alarmForm').onsubmit = async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.target));
+  values.type = 'alarm';
+
+  try {
+    await request('/calls', {
+      method:'POST',
+      body:JSON.stringify(values)
+    });
+    event.target.reset();
+    await refresh();
+    notify('Тревога отправлена диспетчеру');
+  } catch (error) {
+    notify(error.message, true);
+  }
+};
+
+$('logout').onclick = logout;
+$('refresh').onclick = () =>
+  refresh().catch(error => notify(error.message, true));
+
+setInterval(() => {
+  if (me) refresh().catch(() => {});
+}, 5000);
+
+initialize();
+</script>
+</body>
+</html>

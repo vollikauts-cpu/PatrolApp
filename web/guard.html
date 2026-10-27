@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>PatrolApp — Патрульная служба</title>
+<style>
+:root{
+ --bg:#0b121c;--panel:#121c28;--panel2:#172331;
+ --line:#263444;--text:#f1f5fb;--muted:#95a4b7;
+ --blue:#39a9f5;--red:#f04452;--green:#22c477;
+ --orange:#f49a35
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+ font-family:Inter,Arial,sans-serif;font-size:14px}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.topbar{height:70px;display:flex;align-items:center;
+ justify-content:space-between;padding:0 25px;
+ background:#121c27;border-bottom:1px solid var(--line);gap:15px}
+.brand{display:flex;align-items:center;gap:12px;min-width:230px}
+.shield{width:44px;height:44px;border-radius:13px;
+ background:linear-gradient(145deg,#596e88,#25364a);
+ display:grid;place-items:center;font-size:25px}
+.brand b{font-size:20px;letter-spacing:1px}
+.brand small{display:block;color:var(--muted);font-size:10px;
+ letter-spacing:1.4px;margin-top:3px}
+nav{display:flex;align-items:center;gap:8px}
+nav button{padding:13px 19px;background:transparent;color:#aeb9c8;
+ border:0;border-radius:7px;white-space:nowrap}
+nav button.active{background:#1d3046;color:var(--blue);
+ border-bottom:2px solid var(--blue)}
+.profile{display:flex;align-items:center;gap:13px}
+.avatar{width:36px;height:36px;background:#304155;
+ border-radius:50%;display:grid;place-items:center}
+.profile small{display:block;color:var(--muted);margin-top:3px}
+.logout{border:1px solid #405068;background:#1c2a3a;
+ color:white;border-radius:8px;padding:8px 12px}
+.workspace{height:calc(100dvh - 70px);display:grid;
+ grid-template-columns:21% 23% 56%;min-height:0}
+.column{min-height:0;overflow:auto;background:var(--panel);
+ border-right:1px solid var(--line)}
+.calls-column{padding:8px 6px}
+.column-title{display:flex;justify-content:space-between;
+ align-items:center;padding:10px 12px 15px}
+.column-title h2{font-size:17px;margin:0}
+select,.search{background:#1b2938;color:#e4ebf5;
+ border:1px solid #304154;border-radius:7px;padding:9px}
+.call{padding:13px 14px;margin-bottom:5px;
+ border:1px solid #253446;border-left:4px solid #66788d;
+ border-radius:7px;background:#15212d;cursor:pointer}
+.call.selected{background:#30222b;border-color:#9b3646}
+.call.urgent{border-left-color:var(--red)}
+.call.normal{border-left-color:var(--orange)}
+.call.completed{border-left-color:var(--green)}
+.call .line{display:flex;justify-content:space-between;
+ align-items:center;gap:8px}
+.tag{font-size:11px;padding:5px 9px;border-radius:6px;
+ background:#354256;color:#e5edf6}
+.tag.red{background:#8a2634;color:#ffd8de}
+.tag.orange{background:#593d20;color:#ffd29c}
+.tag.green{background:#174d36;color:#a1f4c7}
+.call h3{font-size:14px;margin:11px 0 7px}
+.call p{color:var(--muted);font-size:12px;margin:0}
+.call time{color:var(--muted);font-size:11px}
+.detail-column{padding:18px 17px}
+.incident-header{display:flex;align-items:center;gap:12px}
+.incident-header .id{color:var(--muted);font-size:12px}
+.detail-column h2{font-size:20px;margin:14px 0 8px}
+.address{color:#9cacc0;font-size:13px}
+.tabs{display:flex;border-bottom:1px solid var(--line);
+ margin:18px 0 20px}
+.tabs button{flex:1;background:none;border:0;color:#a5b2c3;
+ padding:13px 4px;font-size:12px}
+.tabs button.active{color:var(--blue);border-bottom:2px solid var(--blue);
+ background:#1c2c3d}
+.field{margin-bottom:24px}
+.field-label{color:#9dabbc;font-size:12px;margin-bottom:9px}
+.field-value{font-size:14px;line-height:1.6}
+.field-value b{font-weight:600}
+.field-value .icon{font-size:20px;margin-right:10px}
+.blue-link{color:var(--blue);text-decoration:none}
+.description{color:#b8c4d1;line-height:1.6;font-size:13px}
+.action-row{display:flex;gap:10px;margin-top:18px}
+.btn{border:0;border-radius:7px;padding:13px 16px;
+ color:white;font-weight:600;background:#267ec1}
+.btn.green{background:#19aa67}
+.btn.red-outline{background:transparent;color:#ff6873;
+ border:1px solid #c83b49}
+.btn.secondary{background:#293a4d}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.action-row .btn{flex:1}
+.report{width:100%;min-height:130px;resize:vertical;
+ border:1px solid #42556a;border-radius:8px;
+ background:#0c1623;color:white;padding:12px;margin:12px 0}
+.map-column{position:relative;min-width:0;display:flex;flex-direction:column}
+#map{flex:1;min-height:250px;background:#1a2837}
+.map-search{position:absolute;top:17px;right:65px;z-index:500;
+ background:#172434;border:1px solid #34465c;color:#c5d2e1;
+ padding:13px 16px;border-radius:8px;max-width:260px}
+.map-actions{position:absolute;top:17px;right:15px;z-index:500}
+.map-actions button{background:#172434;border:1px solid #34465c;
+ color:white;padding:12px;border-radius:8px}
+.map-notice{position:absolute;bottom:112px;left:18px;z-index:500;
+ max-width:340px;background:#142334e8;color:#b9c9dc;
+ padding:10px 13px;border:1px solid #33465c;
+ border-radius:8px;font-size:12px}
+.stats{height:94px;background:#101a25;
+ border-top:1px solid var(--line);display:grid;
+ grid-template-columns:repeat(4,1fr);align-items:center}
+.stat{padding:12px 16px;border-right:1px solid var(--line)}
+.stat small{display:block;color:#a1adbd;font-size:11px}
+.stat strong{display:block;font-size:22px;margin-top:7px}
+.stat strong.blue{color:var(--blue)}
+.stat strong.red{color:var(--red)}
+.stat strong.green{color:var(--green)}
+.login-wrap{max-width:410px;margin:70px auto;background:var(--panel);
+ padding:30px;border:1px solid var(--line);border-radius:15px}
+.login-wrap h2{margin-top:0}
+.login-wrap input{width:100%;padding:14px;background:#0b1421;
+ border:1px solid #34465c;border-radius:8px;color:white;margin-bottom:13px}
+.login-wrap .btn{width:100%}
+#message{color:#ff8c96;padding:8px 14px}
+.empty{padding:25px 12px;color:var(--muted);text-align:center}
+.leaflet-container{background:#1a2837}
+@media(max-width:1000px){
+ .workspace{grid-template-columns:29% 32% 39%}
+ nav button{padding:10px}
+ .brand{min-width:unset}
+ .stats{grid-template-columns:repeat(2,1fr);height:auto}
+}
+@media(max-width:700px){
+ .topbar{height:auto;min-height:65px;padding:10px 12px;flex-wrap:wrap}
+ .brand b{font-size:17px}
+ .brand small{font-size:8px}
+ nav{order:3;width:100%;justify-content:space-between}
+ nav button{font-size:12px;padding:9px 12px}
+ .workspace{height:auto;display:flex;flex-direction:column}
+ .column{overflow:visible}
+ .calls-column{max-height:310px;overflow:auto}
+ .detail-column{padding:18px}
+ #map{height:410px;flex:none}
+ .map-column{min-height:500px}
+ .stats{height:auto}
+ .map-notice{bottom:125px}
+ .profile small{display:none}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+ <div class="brand">
+  <div class="shield">🛡️</div>
+  <div><b>ОХРАНА</b><small>ПАТРУЛЬНАЯ СЛУЖБА</small></div>
+ </div>
+ <nav>
+  <button class="active" data-nav="calls">⌕ &nbsp; Вызовы</button>
+  <button data-nav="map">♧ &nbsp; Карта</button>
+  <button data-nav="team">♟ &nbsp; Экипажи</button>
+  <button data-nav="reports">▤ &nbsp; Отчёты</button>
+ </nav>
+ <div class="profile">
+  <div class="avatar">👤</div>
+  <div><b id="username">Сотрудник</b><small>Сотрудник патруля</small></div>
+  <button id="logout" class="logout hidden">Выход</button>
+ </div>
+</header>
+
+<div id="message"></div>
+
+<section id="login" class="login-wrap">
+ <h2>Вход сотрудника патруля</h2>
+ <form id="loginForm">
+  <input type="email" name="email" placeholder="Email" required>
+  <input type="password" name="password" placeholder="Пароль" required>
+  <button class="btn green">Войти</button>
+ </form>
+</section>
+
+<main id="workspace" class="workspace hidden">
+ <aside class="column calls-column" id="callsSection">
+  <div class="column-title">
+   <h2>Вызовы (<span id="callCount">0</span>)</h2>
+   <select id="filter">
+    <option value="all">Все</option>
+    <option value="active">Активные</option>
+    <option value="completed">Завершённые</option>
+   </select>
+  </div>
+  <div id="callList"></div>
+ </aside>
+
+ <section class="column detail-column" id="detailsSection">
+  <div id="details">
+   <div class="empty">Выберите вызов</div>
+  </div>
+ </section>
+
+ <section class="map-column" id="mapSection">
+  <div id="map"></div>
+  <div class="map-search">⌕ &nbsp; Карта объектов и вызовов</div>
+  <div class="map-actions">
+   <button id="locate" title="Моё местоположение">⌖</button><button id="shareLocation" title="Передавать местоположение патруля">🚙</button>
+  </div>
+  <div id="mapNotice" class="map-notice">
+   Для маршрута нужны координаты объекта и разрешение на геолокацию.
+  </div>
+  <footer class="stats">
+   <div class="stat"><small>Мои вызовы</small><strong class="blue" id="statAll">0</strong></div>
+   <div class="stat"><small>Активные вызовы</small><strong class="red" id="statActive">0</strong></div>
+   <div class="stat"><small>Завершено</small><strong class="green" id="statDone">0</strong></div>
+   <div class="stat"><small>Статус</small><strong style="font-size:16px">На связи</strong></div>
+  </footer>
+ </section>
+</main>
+
+<script type="module">
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+const API='http://127.0.0.1:3001/api';
+
+// PATROLAPP_MARKERS_V2
+let mapMarkers=[];
+let mapRefreshBusy=false;
+
+function markerIcon(color, symbol) {
+ return L.divIcon({
+  className:'',
+  html:`<div style="
+   width:38px;height:38px;display:grid;place-items:center;
+   background:${color};border:3px solid #ffffff88;
+   border-radius:50% 50% 50% 6px;
+   transform:rotate(-45deg);
+   box-shadow:0 0 20px ${color}99;
+  "><span style="transform:rotate(45deg);font-size:19px">
+   ${symbol}</span></div>`,
+  iconSize:[38,38],
+  iconAnchor:[19,38]
+ });
+}
+
+async function refreshMapMarkers() {
+ if(!map || !user || mapRefreshBusy)return;
+ mapRefreshBusy=true;
+ try {
+  const data=await api('/map');
+
+  for(const marker of mapMarkers)map.removeLayer(marker);
+  mapMarkers=[];
+
+  for(const site of data.sites) {
+   const lat=Number(site.latitude);
+   const lon=Number(site.longitude);
+   if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
+
+   const active=data.calls.filter(c=>c.site_id===site.id);
+   const alarm=active.some(c=>c.type==='alarm'||c.priority==='urgent');
+   const color=alarm?'#f04452':active.length?'#f49a35':'#249fff';
+   const symbol=alarm?'🚨':active.length?'!':'⌂';
+
+   const marker=L.marker([lat,lon],{
+    icon:markerIcon(color,symbol)
+   }).addTo(map);
+
+   const label=document.createElement('div');
+   const name=document.createElement('strong');
+   name.textContent=site.name;
+   const address=document.createElement('div');
+   address.textContent=site.address||'';
+   label.append(name,address);
+   marker.bindPopup(label);
+   mapMarkers.push(marker);
+  }
+
+  for(const patrol of data.patrols) {
+   const lat=Number(patrol.latitude);
+   const lon=Number(patrol.longitude);
+   if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
+
+   const busy=data.calls.some(c=>
+    c.guard_id===patrol.user_id &&
+    ['accepted','enroute','onsite'].includes(c.status)
+   );
+
+   const color=busy?'#249fff':'#21bd6e';
+   const marker=L.marker([lat,lon],{
+    icon:markerIcon(color,'🚙')
+   }).addTo(map);
+
+   const label=document.createElement('strong');
+   label.textContent=patrol.name;
+   marker.bindPopup(label);
+   mapMarkers.push(marker);
+  }
+ }catch(e){
+  console.warn('Map refresh:',e.message);
+ }finally{
+  mapRefreshBusy=false;
+ }
+}
+
+const $=id=>document.getElementById(id);
+let token=sessionStorage.getItem('guard_token');
+let user=null,calls=[],sites=[],selected=null,map=null;
+let siteMarker=null,locationMarker=null,routeLayer=null;
+let currentLocation=null,activeTab='info',refreshing=false;
+let previousIds=new Set(),initializedCalls=false;
+let lastReportDraft='',reportCallId=null;
+
+const statusText={
+ new:'Ожидает принятия',accepted:'Принят',enroute:'В пути',
+ onsite:'На месте',completed:'Выполнен',
+ alarm:'Тревога',acknowledged:'Принята диспетчером'
+};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({
+ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+})[c]);
+
+function message(text=''){$('message').textContent=text}
+function localDate(v){
+ if(!v)return '—';
+ const d=new Date(v.replace(' ','T')+(v.includes('Z')?'':'Z'));
+ return Number.isNaN(d.getTime())?v:d.toLocaleString('ru-RU');
+}
+function time(v){
+ const d=new Date(v.replace(' ','T')+(v.includes('Z')?'':'Z'));
+ return Number.isNaN(d.getTime())?'—':d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+}
+async function api(path,options={}){
+ const r=await fetch(API+path,{
+  ...options,
+  headers:{
+   'Content-Type':'application/json',
+   ...(token?{Authorization:'Bearer '+token}:{})
+  }
+ });
+ const data=await r.json();
+ if(!r.ok)throw new Error(data.error||'Ошибка API');
+ return data;
+}
+function initMap(){
+ if(map)return;
+ map=L.map('map',{zoomControl:false}).setView([59.437,24.7536],12);
+ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19,attribution:'© OpenStreetMap contributors'
+ }).addTo(map);
+ L.control.zoom({position:'bottomright'}).addTo(map);
+ setTimeout(()=>map.invalidateSize(),500);
+}
+function findSite(call){
+ return sites.find(s=>Number(s.id)===Number(call.site_id));
+}
+function coords(site){
+ if(!site)return null;
+ const lat=Number(site.latitude??site.lat);
+ const lon=Number(site.longitude??site.lng??site.lon);
+ if(!Number.isFinite(lat)||!Number.isFinite(lon)||
+    lat===0||lon===0||Math.abs(lat)>90||Math.abs(lon)>180)return null;
+ return [lat,lon];
+}
+async function showOnMap(call){
+ if(!map)return;
+ if(siteMarker)map.removeLayer(siteMarker);
+ if(routeLayer)map.removeLayer(routeLayer);
+ siteMarker=null;routeLayer=null;
+ const site=findSite(call);
+ const destination=coords(site);
+ if(!destination){
+  $('mapNotice').textContent='У объекта пока нет координат. Маршрут появится после их добавления.';
+  return;
+ }
+ siteMarker=L.circleMarker(destination,{
+  radius:13,color:'#ff5265',fillColor:'#f04452',
+  fillOpacity:.8,weight:3
+ }).addTo(map).bindPopup(esc(call.title));
+ map.setView(destination,14);
+ $('mapNotice').textContent='Объект отмечен на карте. Нажмите ⌖ для построения маршрута.';
+ if(currentLocation)await drawRoute(destination);
+}
+async function drawRoute(destination){
+ if(!currentLocation)return;
+ const [a,b]=currentLocation,[c,d]=destination;
+ const url=`https://router.project-osrm.org/route/v1/driving/${b},${a};${d},${c}?overview=full&geometries=geojson`;
+ try{
+  const response=await fetch(url);
+  if(!response.ok)throw Error('Маршрут недоступен');
+  const data=await response.json();
+  const geometry=data.routes?.[0]?.geometry;
+  if(!geometry)throw Error('Маршрут не найден');
+  if(routeLayer)map.removeLayer(routeLayer);
+  routeLayer=L.geoJSON(geometry,{
+   style:{color:'#27a7ff',weight:6,opacity:.9}
+  }).addTo(map);
+  map.fitBounds(routeLayer.getBounds(),{padding:[35,35]});
+  const km=(data.routes[0].distance/1000).toFixed(1);
+  const min=Math.round(data.routes[0].duration/60);
+  $('mapNotice').textContent=`Маршрут: ${km} км · около ${min} мин (оценка)`;
+ }catch{
+  $('mapNotice').textContent='Не удалось построить дорожный маршрут. Проверьте подключение.';
+ }
+}
+function locate(){
+ if(!navigator.geolocation){
+  message('Геолокация не поддерживается');
+  return;
+ }
+ navigator.geolocation.getCurrentPosition(async p=>{
+  currentLocation=[p.coords.latitude,p.coords.longitude];
+  if(locationMarker)map.removeLayer(locationMarker);
+  locationMarker=L.circleMarker(currentLocation,{
+   radius:9,color:'#fff',fillColor:'#249fff',fillOpacity:1
+  }).addTo(map).bindPopup('Моё местоположение');
+  const call=calls.find(c=>c.id===selected);
+  const destination=call?coords(findSite(call)):null;
+  if(destination)await drawRoute(destination);
+  else{
+   map.setView(currentLocation,14);
+   $('mapNotice').textContent='Местоположение получено. Для маршрута добавьте координаты объекта.';
+  }
+ },e=>message('Не удалось получить геолокацию: '+e.message),{
+  enableHighAccuracy:true,timeout:12000,maximumAge:10000
+ });
+}
+
+$('locate').onclick=locate;
+
+let sharingWatch=null;
+let sendingLocation=false;
+
+$('shareLocation').onclick=async()=>{
+ if(sharingWatch!==null){
+  navigator.geolocation.clearWatch(sharingWatch);
+  sharingWatch=null;
+  $('shareLocation').style.background='#172434';
+  try{await api('/patrol/location',{method:'DELETE'})}catch(e){
+   message(e.message);
+  }
+  message('Передача геолокации остановлена');
+  await refreshMapMarkers();
+  return;
+ }
+
+ if(!navigator.geolocation){
+  message('Геолокация недоступна');
+  return;
+ }
+
+ sharingWatch=navigator.geolocation.watchPosition(async position=>{
+  if(sendingLocation)return;
+  sendingLocation=true;
+  try{
+   const latitude=position.coords.latitude;
+   const longitude=position.coords.longitude;
+   currentLocation=[latitude,longitude];
+   await api('/patrol/location',{
+    method:'POST',
+    body:JSON.stringify({latitude,longitude})
+   });
+   await refreshMapMarkers();
+  }catch(e){
+   message(e.message);
+  }finally{
+   sendingLocation=false;
+  }
+ },e=>message('Ошибка геолокации: '+e.message),{
+  enableHighAccuracy:true,
+  maximumAge:10000,
+  timeout:15000
+ });
+
+ $('shareLocation').style.background='#126c4d';
+ message('Передача геолокации включена');
+};
+
+
+function choose(id){
+ if(reportCallId!==id)lastReportDraft='';
+ selected=id;
+ activeTab='info';
+ render();
+ const call=calls.find(c=>c.id===id);
+ if(call)showOnMap(call);
+}
+function renderList(){
+ const filter=$('filter').value;
+ const visible=calls.filter(c=>
+  filter==='all'||(filter==='completed'
+   ?c.status==='completed':c.status!=='completed')
+ );
+ $('callCount').textContent=calls.length;
+ $('statAll').textContent=calls.length;
+ $('statActive').textContent=calls.filter(c=>c.status!=='completed').length;
+ $('statDone').textContent=calls.filter(c=>c.status==='completed').length;
+ $('callList').innerHTML=visible.length?visible.map(c=>{
+  const done=c.status==='completed';
+  const urgent=c.priority==='urgent'||c.type==='alarm';
+  const color=done?'green':urgent?'red':'orange';
+  const site=findSite(c);
+  return `<article class="call ${done?'completed':urgent?'urgent':'normal'} ${selected===c.id?'selected':''}"
+    data-call="${c.id}">
+   <div class="line"><span class="tag ${color}">${esc(statusText[c.status]||c.status)}</span>
+   <time>${time(c.created_at)}</time></div>
+   <h3>${esc(c.title)}</h3>
+   <p>${esc(site?.address||c.site_name||'Объект не указан')}</p>
+  </article>`;
+ }).join(''):'<div class="empty">Вызовов нет</div>';
+ document.querySelectorAll('[data-call]').forEach(el=>{
+  el.onclick=()=>choose(Number(el.dataset.call));
+ });
+}
+function detailHTML(c){
+ if(!c)return '<div class="empty">Выберите вызов</div>';
+ const site=findSite(c);
+ const urgent=c.priority==='urgent'||c.type==='alarm';
+ const tabs=`<div class="tabs">
+  <button data-tab="info" class="${activeTab==='info'?'active':''}">Информация</button>
+  <button data-tab="site" class="${activeTab==='site'?'active':''}">Объект</button>
+  <button data-tab="history" class="${activeTab==='history'?'active':''}">История</button>
+ </div>`;
+ let body='';
+ if(activeTab==='info'){
+  body=`
+   <div class="field"><div class="field-label">Тип вызова</div>
+    <div class="field-value"><span class="icon">${urgent?'🚨':'🛡️'}</span>
+    <b>${esc(c.type==='alarm'?'Тревога':'Вызов патруля')}</b></div></div>
+   <div class="field"><div class="field-label">Время поступления</div>
+    <div class="field-value">◷ &nbsp; ${localDate(c.created_at)}</div></div>
+   <div class="field"><div class="field-label">Адрес</div>
+    <div class="field-value">📍 &nbsp; <b>${esc(site?.address||'Не указан')}</b></div>
+    <a href="#" id="routeLink" class="blue-link">Построить маршрут</a></div>
+   <div class="field"><div class="field-label">Объект</div>
+    <div class="field-value">▦ &nbsp; <b>${esc(c.site_name||'Не указан')}</b></div></div>
+   <div class="field"><div class="field-label">Дополнительная информация</div>
+    <div class="description">${esc(c.description||'Нет описания')}</div></div>`;
+ }else if(activeTab==='site'){
+  body=`<div class="field"><div class="field-label">Название объекта</div>
+   <div class="field-value">${esc(site?.name||c.site_name||'Не указан')}</div></div>
+   <div class="field"><div class="field-label">Адрес объекта</div>
+   <div class="field-value">${esc(site?.address||'Не указан')}</div></div>
+   <p class="description">Контактные лица и фотографии появятся после добавления этих данных в базу объектов.</p>`;
+ }else{
+  body='<div id="historyContent" class="description">Загрузка истории...</div>';
+ }
+ let actions='';
+ if(c.type==='dispatch'){
+  if(c.status==='new')actions='<button class="btn green" data-action="accepted">✓ Принять вызов</button>';
+  if(c.status==='accepted')actions='<button class="btn" data-action="enroute">🚗 В пути</button><button class="btn green" data-action="arrive">📍 На месте</button>';
+  if(c.status==='enroute')actions='<button class="btn green" data-action="arrive">📍 На месте</button>';
+  if(c.status==='onsite')actions=`
+   <div style="width:100%"><b>Рапорт по вызову</b>
+   <p class="description">Опишите ситуацию, действия и результат проверки.</p>
+   <textarea class="report" id="report" placeholder="Что обнаружено на объекте? Какие действия предприняты?"></textarea>
+   <button class="btn green" data-action="complete" style="width:100%">✓ Отправить рапорт и завершить</button></div>`;
+ }
+ return `<div class="incident-header">
+  <span class="tag ${urgent?'red':'orange'}">${urgent?'Тревога':'Вызов'}</span>
+  <span class="id">ID #${c.id}</span></div>
+  <h2>${esc(c.title)}</h2>
+  <div class="address">📍 ${esc(site?.address||'Адрес не указан')}</div>
+  ${tabs}${body}
+  <div class="action-row">${actions}</div>`;
+}
+async function renderHistory(c){
+ try{
+  const events=await api(`/calls/${c.id}/events`);
+  if(selected!==c.id||activeTab!=='history')return;
+  const el=$('historyContent');
+  if(el)el.innerHTML=events.map(e=>
+   `<div class="field"><b>${esc(statusText[e.action]||e.action)}</b>
+   <div class="description">${esc(e.actor_name)} · ${localDate(e.created_at)}</div></div>`
+  ).join('')||'История пока пуста';
+ }catch(e){message(e.message)}
+}
+function renderDetails(){
+ const c=calls.find(x=>x.id===selected);
+ $('details').innerHTML=detailHTML(c);
+ if(!c)return;
+ document.querySelectorAll('[data-tab]').forEach(el=>{
+  el.onclick=()=>{activeTab=el.dataset.tab;renderDetails()};
+ });
+ if(activeTab==='history')renderHistory(c);
+ const route=$('routeLink');
+ if(route)route.onclick=e=>{e.preventDefault();locate()};
+ const report=$('report');
+ if(report){
+  reportCallId=c.id;
+  report.value=lastReportDraft;
+  report.oninput=()=>{lastReportDraft=report.value};
+ }
+ document.querySelectorAll('[data-action]').forEach(el=>{
+  el.onclick=()=>perform(c,el.dataset.action);
+ });
+}
+function render(){renderList();renderDetails()}
+async function perform(c,action){
+ try{
+  let path=`/calls/${c.id}/status`;
+  let method='PATCH',body={status:action};
+  if(action==='arrive'){
+   path=`/calls/${c.id}/arrive`;method='POST';body={};
+  }
+  if(action==='complete'){
+   const report=$('report')?.value.trim()||'';
+   if(report.length<20){
+    message('Рапорт должен содержать минимум 20 символов');
+    return;
+   }
+   path=`/calls/${c.id}/complete`;method='POST';body={report};
+  }
+  await api(path,{method,body:JSON.stringify(body)});
+  if(action==='complete'){lastReportDraft='';reportCallId=null}
+  message('');
+  await refresh();
+  await refreshMapMarkers();
+ }catch(e){message(e.message)}
+}
+async function refresh(){
+ if(!user||refreshing)return;
+ refreshing=true;
+ try{
+  const data=await api('/calls');
+  if(initializedCalls){
+   const fresh=data.filter(c=>!previousIds.has(c.id)&&c.status!=='completed');
+   if(fresh.length){
+    selected=fresh[0].id;
+    activeTab='info';
+    message('🚨 Поступил новый вызов: '+fresh[0].title);
+    if(map)showOnMap(fresh[0]);
+   }
+  }
+  previousIds=new Set(data.map(c=>c.id));
+  initializedCalls=true;
+  calls=data;
+  if(!calls.some(c=>c.id===selected)){
+   selected=calls.find(c=>c.status!=='completed')?.id??calls[0]?.id??null;
+   const c=calls.find(x=>x.id===selected);
+   if(c&&map)showOnMap(c);
+  }
+  render();
+ }catch(e){message(e.message)}
+ finally{refreshing=false}
+}
+async function start(){
+ if(!token)return;
+ try{
+  user=await api('/auth/me');
+  if(user.role!=='guard')throw Error('Эта панель предназначена для охранника');
+  $('username').textContent=user.name;
+  sites=await api('/sites');
+  $('login').classList.add('hidden');
+  $('workspace').classList.remove('hidden');
+  $('logout').classList.remove('hidden');
+  initMap();
+  await refresh();
+ }catch(e){
+  message(e.message);
+  token=null;user=null;
+  sessionStorage.removeItem('guard_token');
+ }
+}
+$('loginForm').onsubmit=async e=>{
+ e.preventDefault();
+ try{
+  const values=Object.fromEntries(new FormData(e.target));
+  const data=await api('/auth/login',{
+   method:'POST',body:JSON.stringify(values)
+  });
+  token=data.token;
+  sessionStorage.setItem('guard_token',token);
+  await start();
+ }catch(err){message(err.message)}
+};
+$('logout').onclick=()=>{
+ token=null;user=null;calls=[];initializedCalls=false;
+ sessionStorage.removeItem('guard_token');
+ $('workspace').classList.add('hidden');
+ $('login').classList.remove('hidden');
+ $('logout').classList.add('hidden');
+ message('');
+};
+$('filter').onchange=renderList;
+document.querySelectorAll('[data-nav]').forEach(b=>{
+ b.onclick=()=>{
+  document.querySelectorAll('[data-nav]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const target=b.dataset.nav;
+  if(target==='map'){
+   $('mapSection').scrollIntoView({behavior:'smooth'});
+   map?.invalidateSize();
+  }else if(target==='calls'){
+   $('callsSection').scrollIntoView({behavior:'smooth'});
+  }else if(target==='reports'){
+   $('filter').value='completed';
+   renderList();
+   $('callsSection').scrollIntoView({behavior:'smooth'});
+  }else{
+   message('Раздел экипажей подключим к API на следующем этапе');
+  }
+ };
+});
+setInterval(()=>{if(user){refresh();refreshMapMarkers()}},5000);
+start();
+</script>
+</body>
+</html>

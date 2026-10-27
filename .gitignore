@@ -76,3 +76,43 @@ yarn-error.log
 !.yarn/sdks
 !.yarn/versions
 config.bat
+
+server/node_modules/
+server/data/
+
+server/.env
+server/data/
+server/node_modules/
+
+# PatrolApp secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Databases
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+*.db-*
+server/data/
+
+# Dependencies and builds
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# Backups
+*.backup
+*.backup-*
+*.bak
+*.bak-*
+
+# Additional backup formats
+*.backup.*
+*.backup-*
+*.backup
