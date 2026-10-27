@@ -297,12 +297,23 @@ app.get('/api/sites', auth, (req, res) => {
 app.post('/api/sites', auth, allow('admin'), (req, res) => {
   const name = clean(req.body.name, 120);
   const address = clean(req.body.address, 200);
+  const { latitude, longitude } = req.body;
+  const hasCoordinates =
+    latitude !== undefined || longitude !== undefined;
 
   if (!name) return fail(res, 400, 'Укажите название');
+  if (hasCoordinates &&
+      !validCoordinates(latitude, longitude)) {
+    return fail(res, 400, 'Неверные координаты');
+  }
 
   const result = db.prepare(
-    'INSERT INTO sites(name,address) VALUES(?,?)'
-  ).run(name, address);
+    'INSERT INTO sites(name,address,latitude,longitude) VALUES(?,?,?,?)'
+  ).run(
+    name, address,
+    hasCoordinates ? latitude : null,
+    hasCoordinates ? longitude : null
+  );
 
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });
@@ -670,16 +681,6 @@ app.post('/api/patrol/location', auth, allow('guard'),
       return fail(res, 400, 'Неверные координаты');
     }
 
-    db.prepare(`
-      INSERT INTO patrol_locations
-        (user_id,latitude,longitude,status,updated_at)
-      VALUES(?,?, 'available', 'available', CURRENT_TIMESTAMP)
-      ON CONFLICT(user_id) DO UPDATE SET
-        latitude=excluded.latitude,
-        longitude=excluded.longitude,
-        updated_at=CURRENT_TIMESTAMP
-    `);
-    // Запись ниже использует корректный набор параметров.
     db.prepare(`
       INSERT INTO patrol_locations
         (user_id,latitude,longitude,status,updated_at)

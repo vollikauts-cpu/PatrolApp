@@ -76,6 +76,20 @@ button.danger{background:#b42343}
 </form>
 </div>
 
+
+<div id="sitesAdminPanel" class="card hidden">
+<h2>Добавить охраняемый объект</h2>
+<form id="siteCreateForm">
+<input name="name" placeholder="Название объекта" required>
+<input name="address" placeholder="Адрес объекта">
+<input name="latitude" type="number" step="any"
+ min="-90" max="90" placeholder="Широта" required>
+<input name="longitude" type="number" step="any"
+ min="-180" max="180" placeholder="Долгота" required>
+<button>Сохранить объект</button>
+</form>
+</div>
+
 <div id="dispatchPanel" class="card hidden">
 <h2>Отправить вызов охраннику</h2>
 <form id="dispatchForm">
@@ -179,6 +193,7 @@ async function initialize() {
     $('profile').textContent = `${me.name} (${me.role})`;
 
     show('adminPanel', me.role === 'admin');
+    show('sitesAdminPanel', me.role === 'admin');
     show('dispatchPanel', ['admin','dispatcher'].includes(me.role));
     show('alarmPanel', me.role === 'guard');
 
@@ -375,6 +390,29 @@ $('alarmForm').onsubmit = async event => {
     event.target.reset();
     await refresh();
     notify('Тревога отправлена диспетчеру');
+  } catch (error) {
+    notify(error.message, true);
+  }
+};
+
+
+$('siteCreateForm').onsubmit = async event => {
+  event.preventDefault();
+  const form = event.target;
+  const values = Object.fromEntries(new FormData(form));
+  try {
+    await request('/sites', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: values.name,
+        address: values.address,
+        latitude: Number(values.latitude),
+        longitude: Number(values.longitude)
+      })
+    });
+    form.reset();
+    if (me.role === 'admin') await loadOptions();
+    notify('Объект сохранён с координатами');
   } catch (error) {
     notify(error.message, true);
   }
