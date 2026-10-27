@@ -27,8 +27,6 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
 
       - name: Install Android SDK components
         run: |
