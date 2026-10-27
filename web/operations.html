@@ -81,11 +81,15 @@ button.danger{background:#b42343}
 <h2>Добавить охраняемый объект</h2>
 <form id="siteCreateForm">
 <input name="name" placeholder="Название объекта" required>
-<input name="address" placeholder="Адрес объекта">
-<input name="latitude" type="number" step="any"
- min="-90" max="90" placeholder="Широта" required>
-<input name="longitude" type="number" step="any"
- min="-180" max="180" placeholder="Долгота" required>
+
+<div style="position:relative">
+<input id="siteAddress" name="address"
+ placeholder="Начните вводить адрес..."
+ autocomplete="off" required>
+<div id="addressSuggestions"
+ style="position:relative;z-index:20"></div>
+</div>
+<small>Выберите адрес из подсказок.</small>
 <button>Сохранить объект</button>
 </form>
 </div>
@@ -95,7 +99,7 @@ button.danger{background:#b42343}
 <form id="dispatchForm">
 <select name="guard_id" id="guardSelect" required></select>
 <select name="site_id" id="siteSelect"></select>
-<input name="title" placeholder="Причина вызова" required>
+<input name="title" placeholder="Причина (необязательно)">
 <textarea name="description" placeholder="Описание задания"></textarea>
 <select name="priority">
 <option value="normal">Обычный</option>
@@ -108,7 +112,7 @@ button.danger{background:#b42343}
 <div id="alarmPanel" class="card hidden">
 <h2>Вызов диспетчера</h2>
 <form id="alarmForm">
-<input name="title" placeholder="Что произошло?" required>
+<input name="title" placeholder="Причина (необязательно)">
 <textarea name="description" placeholder="Опиши ситуацию"></textarea>
 <select name="priority">
 <option value="urgent">Срочная тревога</option>
@@ -363,6 +367,7 @@ $('dispatchForm').onsubmit = async event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.target));
   values.type = 'dispatch';
+  values.title = values.title?.trim() || 'Valehäire';
 
   try {
     await request('/calls', {
@@ -381,6 +386,7 @@ $('alarmForm').onsubmit = async event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.target));
   values.type = 'alarm';
+  values.title = values.title?.trim() || 'Valehäire';
 
   try {
     await request('/calls', {
@@ -396,21 +402,103 @@ $('alarmForm').onsubmit = async event => {
 };
 
 
+
+let chosenAddress = null;
+let addressTimer = null;
+let addressController = null;
+
+const addressInput = $('siteAddress');
+const suggestions = $('addressSuggestions');
+
+function clearSuggestions() {
+  suggestions.replaceChildren();
+}
+
+addressInput.addEventListener('input', () => {
+  chosenAddress = null;
+  clearTimeout(addressTimer);
+  if (addressController) addressController.abort();
+  clearSuggestions();
+
+  const query = addressInput.value.trim();
+  if (query.length < 3) return;
+
+  addressTimer = setTimeout(async () => {
+    addressController = new AbortController();
+    try {
+      const url = 'https://photon.komoot.io/api/?q=' +
+        encodeURIComponent(query) +
+        '&limit=6&lat=59.437&lon=24.7536';
+
+      const response = await fetch(url, {
+        signal: addressController.signal
+      });
+      if (!response.ok) throw Error('Ошибка поиска');
+
+      const data = await response.json();
+      if (addressInput.value.trim() !== query) return;
+      clearSuggestions();
+
+      if (!data.features.length) {
+        suggestions.textContent = 'Адрес не найден';
+        return;
+      }
+
+      for (const feature of data.features) {
+        const p = feature.properties;
+        const parts = [
+          [p.street, p.housenumber].filter(Boolean).join(' '),
+          p.name, p.city, p.postcode, p.country
+        ].filter(Boolean);
+        const label = [...new Set(parts)].join(', ');
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.style.cssText =
+          'display:block;width:100%;text-align:left;' +
+          'background:#25334c;margin:2px 0';
+
+        button.onclick = () => {
+          chosenAddress = {
+            address: label,
+            latitude: feature.geometry.coordinates[1],
+            longitude: feature.geometry.coordinates[0]
+          };
+          addressInput.value = label;
+          clearSuggestions();
+        };
+        suggestions.append(button);
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError')
+        suggestions.textContent = 'Поиск временно недоступен';
+    }
+  }, 1000);
+});
+
 $('siteCreateForm').onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
+  if (!chosenAddress ||
+      form.elements.address.value !== chosenAddress.address) {
+    notify('Выберите адрес из списка', true);
+    return;
+  }
   const values = Object.fromEntries(new FormData(form));
   try {
     await request('/sites', {
       method: 'POST',
       body: JSON.stringify({
         name: values.name,
-        address: values.address,
-        latitude: Number(values.latitude),
-        longitude: Number(values.longitude)
+        address: chosenAddress.address,
+        latitude: chosenAddress.latitude,
+        longitude: chosenAddress.longitude
       })
     });
     form.reset();
+    chosenAddress = null;
+    clearSuggestions();
     if (me.role === 'admin') await loadOptions();
     notify('Объект сохранён с координатами');
   } catch (error) {

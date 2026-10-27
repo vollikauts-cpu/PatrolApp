@@ -604,10 +604,6 @@ async function perform(c,action){
   }
   if(action==='complete'){
    const report=$('report')?.value.trim()||'';
-   if(report.length<20){
-    message('Рапорт должен содержать минимум 20 символов');
-    return;
-   }
    path=`/calls/${c.id}/complete`;method='POST';body={report};
   }
   await api(path,{method,body:JSON.stringify(body)});
@@ -617,11 +613,93 @@ async function perform(c,action){
   await refreshMapMarkers();
  }catch(e){message(e.message)}
 }
+
+let sirenContext = null;
+let sirenTimer = null;
+let pendingCallIds = new Set();
+
+function unlockSiren() {
+  const AudioClass =
+    window.AudioContext || window.webkitAudioContext;
+  if (!AudioClass) return;
+  if (!sirenContext) sirenContext = new AudioClass();
+  if (sirenContext.state === 'suspended')
+    sirenContext.resume().catch(() => {});
+}
+
+function sirenPulse() {
+  if (!sirenContext || sirenContext.state !== 'running')
+    return;
+
+  const now = sirenContext.currentTime;
+  const oscillator = sirenContext.createOscillator();
+  const gain = sirenContext.createGain();
+
+  oscillator.type = 'sawtooth';
+  oscillator.frequency.setValueAtTime(650, now);
+  oscillator.frequency.linearRampToValueAtTime(
+    1100, now + 0.45
+  );
+  oscillator.frequency.linearRampToValueAtTime(
+    650, now + 0.9
+  );
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(0.13, now + 0.05);
+  gain.gain.setValueAtTime(0.13, now + 0.8);
+  gain.gain.linearRampToValueAtTime(0.0001, now + 0.95);
+
+  oscillator.connect(gain);
+  gain.connect(sirenContext.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.96);
+}
+
+function stopSiren() {
+  if (sirenTimer !== null) {
+    clearInterval(sirenTimer);
+    sirenTimer = null;
+  }
+}
+
+function updateSiren(data) {
+  const pending = data.filter(c =>
+    c.type === 'dispatch' &&
+    c.status === 'new' &&
+    Number(c.guard_id) === Number(user?.id)
+  );
+
+  pendingCallIds = new Set(pending.map(c => c.id));
+
+  if (!pending.length) {
+    stopSiren();
+    return;
+  }
+
+  if (sirenTimer === null) {
+    unlockSiren();
+    sirenPulse();
+    sirenTimer = setInterval(sirenPulse, 1100);
+  }
+}
+
+const soundButton = document.createElement('button');
+soundButton.className = 'logout';
+soundButton.textContent = '🔊 Включить звук';
+soundButton.onclick = async () => {
+  unlockSiren();
+  if (sirenContext) await sirenContext.resume();
+  soundButton.textContent = '🔊 Звук включён';
+  if (pendingCallIds.size) sirenPulse();
+};
+document.querySelector('.profile').prepend(soundButton);
+
 async function refresh(){
  if(!user||refreshing)return;
  refreshing=true;
  try{
   const data=await api('/calls');
+  updateSiren(data);
   if(initializedCalls){
    const fresh=data.filter(c=>!previousIds.has(c.id)&&c.status!=='completed');
    if(fresh.length){
@@ -674,6 +752,7 @@ $('loginForm').onsubmit=async e=>{
  }catch(err){message(err.message)}
 };
 $('logout').onclick=()=>{
+ stopSiren();pendingCallIds.clear();
  token=null;user=null;calls=[];initializedCalls=false;
  sessionStorage.removeItem('guard_token');
  $('workspace').classList.add('hidden');

@@ -348,7 +348,7 @@ app.get('/api/calls', auth, (req, res) => {
 
 app.post('/api/calls', auth, (req, res) => {
   const type = req.body.type;
-  const title = clean(req.body.title, 150);
+  const title = clean(req.body.title, 150) || 'Valehäire';
   const description = clean(req.body.description, 2000);
   const priority = req.body.priority === 'urgent'
     ? 'urgent' : 'normal';
@@ -567,11 +567,7 @@ app.post('/api/calls/:id/arrive', auth, allow('guard'), (req, res) => {
 
 app.post('/api/calls/:id/complete', auth, allow('guard'), (req, res) => {
   const id = Number(req.params.id);
-  const report = clean(req.body.report, 5000);
-
-  if (report.length < 20) {
-    return fail(res, 400, 'Рапорт должен содержать минимум 20 символов');
-  }
+  const report = clean(req.body.report, 5000) || 'Valehäire';
 
   const call = db.prepare(
     'SELECT * FROM calls WHERE id=?'
